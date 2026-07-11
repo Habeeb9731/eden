@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>EDEN — Smart Terrarium</title>
+<meta name="description" content="Live dashboard for the EDEN dual-zone smart terrarium">
+<meta name="theme-color" content="#e6e7ec">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="EDEN">
+<style>
+  @font-face {
+    font-family: "Inter";
+    src: url("fonts/inter.woff2") format("woff2");
+    font-weight: 100 900; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: "Inter Tight";
+    src: url("fonts/inter-tight.woff2") format("woff2");
+    font-weight: 100 900; font-style: normal; font-display: swap;
+  }
+  :root {
+    --font:    "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --display: "Inter Tight", "Inter", system-ui, -apple-system, sans-serif;
+    --page:        #e6e7ec;   /* cool lavender-grey */
+    --card:        #ffffff;
+    --card-soft:   #f1f3f5;
+    --ink:         #1a1e18;
+    --ink-2:       #5b6157;
+    --muted:       #969c93;
+    --hairline:    #eceef1;
+    --accent:      #b4e26a;   /* lime — pills, actives, nav, switches */
+    --accent-ink:  #273312;   /* dark ink on lime */
+    --line:        #5f8a2a;   /* data line / active green text */
+    --bar1:        #6fa22e;   /* bar gradient bottom */
+    --bar2:        #c0e777;   /* bar gradient top */
+    --panel:       rgba(17,23,12,.72);   /* hero dark stat overlay */
+    --good:        #2a9d2a;  --good-text:    #1e7a1e;
+    --warn:        #d69e12;  --warn-text:    #93700a;
+    --serious:     #e0794a;  --serious-text: #a8542e;
+    --critical:    #d9463f;  --crit-text:    #b3372c;
+    --shadow: 0 1px 2px rgba(30,40,20,.04), 0 14px 32px rgba(30,40,20,.07);
+    --r: 24px; --r2: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    font-size: 15px;
+  }
+  button { font: inherit; }
+  .wrap {
+    max-width: 460px; margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 14px) 16px calc(120px + env(safe-area-inset-bottom));
+  }
+
+  /* ---------- headings ---------- */
+  .eyebrow { font-size: 12px; color: var(--muted); letter-spacing: .04em; margin: 0 2px 5px; }
+  h1 { font-family: var(--display); font-weight: 680; font-size: 27px; letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance; }
+  section h2 {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 15px; font-weight: 680; margin: 24px 2px 11px; color: var(--ink);
+  }
+
+  /* ---------- banner ---------- */
+  .banner {
+    display: none; margin: 0 0 14px; padding: 13px 15px; border-radius: var(--r2);
+    background: #fdeee7; border: 1px solid #f5d3c3;
+    font-size: 13.5px; line-height: 1.5; align-items: flex-start; gap: 10px; flex-wrap: wrap;
+  }
+  .banner.show { display: flex; }
+  .banner.stale { background: #fbf3dd; border-color: #efdfab; }
+  .banner .b-txt { flex: 1; min-width: 190px; }
+  .banner .b-txt small { color: var(--ink-2); display: block; margin-top: 2px; }
+
+  /* ---------- buttons ---------- */
+  .btn {
+    appearance: none; cursor: pointer; font-size: 13.5px; font-weight: 600;
+    color: var(--ink); background: var(--card); border: 1px solid var(--hairline);
+    border-radius: 999px; padding: 10px 17px;
+  }
+  .btn.primary { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+  .btn:active { transform: scale(.98); }
+  :focus-visible { outline: 2px solid var(--line); outline-offset: 2px; border-radius: 8px; }
+
+  /* ---------- cards ---------- */
+  .card { background: var(--card); border-radius: var(--r); box-shadow: var(--shadow); padding: 18px; }
+
+  /* ---------- status chips ---------- */
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .chip.good    { color: var(--good-text) }    .chip.good .dot    { background: var(--good) }
+  .chip.warn    { color: var(--warn-text) }    .chip.warn .dot    { background: var(--warn) }
+  .chip.serious { color: var(--serious-text) } .chip.serious .dot { background: var(--serious) }
+  .chip.crit    { color: var(--crit-text) }    .chip.crit .dot    { background: var(--critical) }
+  .chip.plain   { color: var(--ink-2) }        .chip.plain .dot   { background: var(--muted) }
+  .chip.accent  { color: var(--line) }         .chip.accent .dot  { background: var(--line) }
+
+  /* ---------- hero (photo card) ---------- */
+  .hero {
+    position: relative; border-radius: var(--r); overflow: hidden;
+    min-height: 384px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+  }
+  .hero-ph {
+    position: absolute; inset: 0; z-index: 0;
+    background: linear-gradient(150deg, #cdd8b6, #a6bd82 60%, #8aa36a);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    color: rgba(30,40,18,.5); font-size: 13px; font-weight: 600;
+  }
+  .hero-bg { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
+  .hero-body {
+    position: relative; z-index: 2; flex: 1;
+    display: flex; flex-direction: column; padding: 16px;
+    background: linear-gradient(180deg, rgba(10,14,8,.34) 0%, rgba(10,14,8,0) 16%, rgba(10,14,8,.06) 36%, rgba(10,14,8,.44) 58%, rgba(10,14,8,.66) 76%, rgba(10,14,8,.72) 100%);
+  }
+  .hero-title-wrap { margin-top: auto; padding: 0 4px 12px; }
+  .hero-title { font-family: var(--display); font-size: 28px; font-weight: 640; letter-spacing: -0.01em; color: #fff; margin: 0; text-shadow: 0 1px 3px rgba(0,0,0,.5), 0 3px 18px rgba(0,0,0,.55); }
+  .hero-meta { font-size: 12.5px; color: #fff; margin-top: 4px; text-shadow: 0 1px 3px rgba(0,0,0,.55), 0 2px 12px rgba(0,0,0,.5); }
+  .hero-panel {
+    border-radius: 18px; padding: 15px 4px 13px;
+    /* liquid glass: translucent so the photo shows through, frosted + specular edges */
+    background: linear-gradient(180deg, rgba(12,16,10,.28), rgba(12,16,10,.46));
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    backdrop-filter: blur(12px) saturate(150%);
+    box-shadow:
+      0 18px 44px rgba(0,0,0,.34),
+      inset 0 1px 1px rgba(255,255,255,.42),
+      inset 0 -8px 20px rgba(255,255,255,.05),
+      inset 0 0 0 1px rgba(255,255,255,.13);
+  }
+  .hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .hs { padding: 0 14px; min-width: 0; }
+  .hs + .hs { border-left: 1px solid rgba(255,255,255,.14); }
+  .hs-ic { color: var(--accent); display: block; margin-bottom: 7px; }
+  .hs-val { font-family: var(--display); font-size: 22px; font-weight: 680; color: #fff; letter-spacing: -0.01em; }
+  .hs-sub { font-size: 10.5px; color: rgba(255,255,255,.6); margin-top: 1px; }
+  .hs-lbl { font-size: 12px; font-weight: 620; color: #fff; margin-top: 5px; }
+  .hero-bar { display: flex; align-items: center; gap: 11px; padding: 13px 14px 2px; margin-top: 12px; border-top: 1px solid rgba(255,255,255,.13); }
+  .hero-bar .hb-l { font-size: 12px; color: rgba(255,255,255,.8); white-space: nowrap; }
+  .hero-bar .hb-track { flex: 1; height: 6px; border-radius: 999px; background: rgba(255,255,255,.22); overflow: hidden; }
+  .hero-bar .hb-track i { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width .5s ease; }
+  .hero-bar .hb-r { font-size: 12px; font-weight: 650; color: #fff; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* ---------- zone cards ---------- */
+  .zones { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .zone { padding: 15px 15px 13px; min-width: 0; }
+  .zone:nth-child(1) { background: #eef6dc; }
+  .zone:nth-child(2) { background: #e6f1ea; }
+  .zone .z-name { font-size: 14px; font-weight: 680; }
+  .zone .z-sub { font-size: 11.5px; color: var(--muted); margin: 1px 0 8px; }
+  .zone .z-val { font-family: var(--display); font-size: 23px; font-weight: 680; letter-spacing: -0.01em; margin-bottom: 4px; }
+  .zone .z-val small { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-left: 2px; }
+  .zone svg.spark { display: block; width: 100%; height: 40px; margin: 4px 0 10px; touch-action: none; cursor: crosshair; }
+  .meter { height: 6px; border-radius: 999px; background: rgba(30,45,15,.1); overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 999px; background: var(--line); transition: width .5s ease; }
+  .zone .z-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .zone .z-pct { font-size: 11.5px; color: var(--ink-2); font-weight: 600; }
+
+  /* ---------- environment grid ---------- */
+  .envgrid { display: grid; grid-template-columns: 1fr 1fr; padding: 0; overflow: hidden; }
+  .env {
+    padding: 16px; min-width: 0;
+    border-right: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+  }
+  .env:nth-child(2n) { border-right: 0; }
+  .env:nth-child(n+3) { border-bottom: 0; }
+  .env .e-top { display: flex; align-items: center; gap: 8px; }
+  .env .e-ic {
+    width: 26px; height: 26px; border-radius: 9px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .env .e-label { font-size: 12px; color: var(--muted); }
+  .env .e-val { font-family: var(--display); font-size: 21px; font-weight: 680; letter-spacing: -0.01em; margin: 3px 0 5px; }
+  .env .e-val small { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-left: 1px; }
+
+  /* ---------- trend mini-cards (one per metric) ---------- */
+  .h2-note { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .trend-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .tcard { padding: 14px; min-width: 0; }
+  .tc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .tc-name { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); font-weight: 600; min-width: 0; }
+  .tc-ic { width: 22px; height: 22px; border-radius: 7px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+  .tc-ic svg { width: 12px; height: 12px; }
+  .delta { font-size: 11.5px; font-weight: 650; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tc-val { font-family: var(--display); font-size: 21px; font-weight: 680; letter-spacing: -0.01em; margin: 7px 0 8px; }
+  svg.tbars { display: block; width: 100%; height: 64px; touch-action: none; cursor: crosshair; }
+
+  /* ---------- systems ---------- */
+  .ctl { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+  .c-head { display: flex; align-items: center; gap: 12px; }
+  .c-ic {
+    width: 40px; height: 40px; border-radius: 13px; flex: none;
+    background: #eef6dc; color: var(--line);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .c-name { font-size: 15px; font-weight: 680; }
+  .c-state { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .c-state.on { color: var(--line); font-weight: 650; }
+  .seg {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+    background: var(--card-soft); border-radius: 999px; padding: 4px;
+  }
+  .seg button {
+    appearance: none; border: 0; background: transparent; color: var(--ink-2);
+    font-size: 13px; font-weight: 600; padding: 8px 0; border-radius: 999px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 680; }
+  .rowline { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
+  .rowline .why { font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+  .switch {
+    appearance: none; position: relative; width: 50px; height: 30px; flex: none; margin: 0;
+    border-radius: 999px; background: #d8dccf; cursor: pointer; transition: background .18s;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(30,40,20,.28);
+    transition: transform .18s;
+  }
+  .switch:checked { background: var(--line); }
+  .switch:checked::after { transform: translateX(20px); }
+  .switch:disabled { opacity: .55; cursor: default; }
+  .slider { width: 100%; accent-color: var(--accent); }
+  .led-row { display: flex; align-items: center; gap: 12px; flex: 1; }
+  .led-val { font-size: 13px; color: var(--ink-2); font-weight: 600; min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+  .pending { opacity: .65; }
+  .disabled-zone { opacity: .5; pointer-events: none; filter: saturate(.5); }
+
+  /* ---------- history ---------- */
+  .tbl-wrap { overflow-x: auto; border-radius: var(--r); box-shadow: var(--shadow); background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { padding: 9px 12px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--hairline); text-align: right; }
+  td { color: var(--ink-2); border-bottom: 1px solid var(--card-soft); }
+  th:first-child, td:first-child { text-align: left; }
+  tr:last-child td { border-bottom: 0; }
+
+  /* ---------- settings ---------- */
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+  .field input[type="text"], .field input[type="number"] {
+    width: 100%; font: inherit; font-size: 14px; color: var(--ink);
+    background: var(--card-soft); border: 1px solid var(--hairline); border-radius: 12px; padding: 11px 13px;
+  }
+  .field .hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+  .field.check { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .field.check label { margin: 0; font-size: 14px; color: var(--ink); }
+  .set-actions { display: flex; gap: 10px; margin-top: 4px; }
+  .about { font-size: 12px; color: var(--muted); line-height: 1.7; margin-top: 22px; text-align: center; }
+
+  /* ---------- tabs & bottom nav ---------- */
+  .tab { display: none; }
+  .tab.active { display: block; }
+  nav {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 30;
+    border-radius: 999px; padding: 6px;
+    /* liquid glass pill: blurred content shows through, glassy specular rim */
+    background: linear-gradient(180deg, rgba(9,10,13,.56), rgba(9,10,13,.72));
+    -webkit-backdrop-filter: blur(22px) saturate(170%);
+    backdrop-filter: blur(22px) saturate(170%);
+    box-shadow:
+      0 10px 30px rgba(0,0,0,.30),
+      inset 0 1px 1px rgba(255,255,255,.4),
+      inset 0 -6px 16px rgba(255,255,255,.05),
+      inset 0 0 0 1px rgba(255,255,255,.12);
+  }
+  nav .in { display: flex; gap: 4px; }
+  nav button {
+    appearance: none; border: 0; background: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  nav button .icb {
+    width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,.66); transition: background .18s, color .18s, transform .18s;
+  }
+  nav button .icb svg { width: 20px; height: 20px; }
+  nav button[aria-pressed="true"] .icb { background: var(--accent); color: var(--accent-ink); }
+  nav button:active .icb { transform: scale(.92); }
+
+  /* ---------- tooltip ---------- */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; display: none;
+    background: #1a1e18; color: #fff; border-radius: 9px;
+    padding: 6px 10px; font-size: 12px; font-weight: 550;
+    box-shadow: 0 6px 20px rgba(20,26,12,.28);
+  }
+  #tip small { color: #b9c0ad; display: block; font-weight: 500; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="banner" id="banner" role="alert">
+    <div class="b-txt"><b id="bTitle"></b><small id="bSub"></small></div>
+    <button class="btn" id="bDemo" hidden>Try demo mode</button>
+  </div>
+
+  <!-- ============ HOME ============ -->
+  <div class="tab active" id="tab-home">
+
+    <div class="hero">
+      <!-- IMAGE PLACEHOLDER: drop a photo at hero.jpg (this whole card becomes its background) -->
+      <div class="hero-ph">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2 2 0 0 1 5 6.5h1.2l1-1.6A2 2 0 0 1 9.9 4h4.2a2 2 0 0 1 1.7 .9l1 1.6H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="12.5" r="3.4"/></svg>
+        <span>Add terrarium photo → hero.jpg</span>
+      </div>
+      <img class="hero-bg" src="hero.jpg" alt="" onerror="this.remove()">
+      <div class="hero-body">
+        <div class="hero-title-wrap">
+          <h1 class="hero-title" id="heroGreet">Hello</h1>
+          <div class="hero-meta" id="heroMeta">Dual-zone · live monitoring</div>
+        </div>
+        <div class="hero-panel">
+          <div class="hero-stats">
+            <div class="hs">
+              <span class="hs-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-7M12 13c0-4-3-6.5-7-6.5 0 4 3 6.5 7 6.5ZM12 11c0-4.5 3-7.5 7-7.5 0 4.5-3 7.5-7 7.5Z"/></svg></span>
+              <div class="hs-val" id="hHealth">–</div>
+              <div class="hs-sub">of 100</div>
+              <div class="hs-lbl">Health</div>
+            </div>
+            <div class="hs">
+              <span class="hs-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5C15 7.5 18 10.8 18 14a6 6 0 1 1-12 0c0-3.2 3-6.5 6-10.5Z"/></svg></span>
+              <div class="hs-val" id="hHum">–</div>
+              <div class="hs-sub">40–80% ideal</div>
+              <div class="hs-lbl">Humidity</div>
+            </div>
+            <div class="hs">
+              <span class="hs-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14c3-2 5-2 8 0s5 2 8 0M4 18c3-2 5-2 8 0s5 2 8 0M6 10.5 12 4l6 6.5"/></svg></span>
+              <div class="hs-val" id="hSoil">–</div>
+              <div class="hs-sub">avg moisture</div>
+              <div class="hs-lbl">Soil</div>
+            </div>
+          </div>
+          <div class="hero-bar">
+            <span class="hb-l">Reservoir</span>
+            <div class="hb-track"><i id="hResBar" style="width:0%"></i></div>
+            <span class="hb-r" id="hResVal">– cm</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section>
+      <h2>Trends <span class="h2-note">last 30 min</span></h2>
+      <div class="trend-grid" id="trendGrid"></div>
+    </section>
+
+    <section>
+      <h2>Watering zones</h2>
+      <div class="zones" id="zoneGrid"></div>
+    </section>
+
+    <section>
+      <h2>Environment <span class="chip plain" id="envChip"><span class="dot"></span><span id="envChipTxt">–</span></span></h2>
+      <div class="card envgrid" id="envGrid"></div>
+    </section>
+  </div>
+
+  <!-- ============ SYSTEMS ============ -->
+  <div class="tab" id="tab-systems">
+    <div class="eyebrow">Pumps · fan · grow light</div>
+    <h1>Systems</h1>
+    <div id="ctlGrid"></div>
+  </div>
+
+  <!-- ============ HISTORY ============ -->
+  <div class="tab" id="tab-history">
+    <div class="eyebrow">Recent readings</div>
+    <h1>History</h1>
+    <div class="tbl-wrap" style="max-height:62vh; overflow-y:auto;">
+      <table id="histTbl">
+        <thead><tr><th>Time</th><th>Soil A</th><th>Soil B</th><th>Temp °C</th><th>Hum %</th><th>Light</th><th>Water cm</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <div class="tab" id="tab-settings">
+    <div class="eyebrow">Device &amp; app</div>
+    <h1>Settings</h1>
+    <div class="card">
+      <div class="field">
+        <label for="fName">Your name</label>
+        <input type="text" id="fName" placeholder="Abdul" autocapitalize="words">
+        <div class="hint">Shown in the home-screen greeting.</div>
+      </div>
+      <div class="field">
+        <label for="fBase">Terrarium address</label>
+        <input type="text" id="fBase" placeholder="same origin (served from the CYD)" inputmode="url" autocapitalize="off" autocorrect="off">
+        <div class="hint">Leave empty when this page is served by the CYD itself. Otherwise e.g. <b>http://192.168.2.50</b>. A page loaded over HTTPS cannot call an HTTP device.</div>
+      </div>
+      <div class="field">
+        <label for="fPoll">Refresh interval (seconds)</label>
+        <input type="number" id="fPoll" min="1.5" max="30" step="0.5">
+        <div class="hint">Keep at 1.5 s or above — the sensor hub has request timeouts under load.</div>
+      </div>
+      <div class="field check">
+        <label for="fDemo">Demo mode (simulated terrarium)</label>
+        <input type="checkbox" id="fDemo" class="switch">
+      </div>
+      <div class="set-actions">
+        <button class="btn primary" id="fSave" type="button">Save</button>
+        <button class="btn" id="fClear" type="button">Clear history</button>
+      </div>
+    </div>
+    <p class="about"><span id="fSrc"></span><br><span id="fLast">–</span><br>EDEN Smart Terrarium · Saarland University</p>
+  </div>
+
+</div>
+
+<nav aria-label="Sections"><div class="in">
+  <button data-tab="home" aria-pressed="true" aria-label="Home" title="Home"><span class="icb">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+  </span></button>
+  <button data-tab="systems" aria-pressed="false" aria-label="Systems" title="Systems"><span class="icb">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/></svg>
+  </span></button>
+  <button data-tab="history" aria-pressed="false" aria-label="History" title="History"><span class="icb">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+  </span></button>
+  <button data-tab="settings" aria-pressed="false" aria-label="Settings" title="Settings"><span class="icb">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.5-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.5 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.5-2-1.5c.06-.4.1-.8.1-1.2Z"/></svg>
+  </span></button>
+</div></nav>
+
+<div id="tip"></div>
+
+<script>
+"use strict";
+/* ================================================================
+   EDEN dashboard — talks to the CYD at BASE (same-origin by default)
+     GET /api/data                       → sensor + actuator snapshot
+     GET /control?device=&mode=[&state=|&brightness=]
+   ================================================================ */
+
+/* ---------- thresholds (mirror EDEN_API_Documentation.md §3) ---------- */
+const TH = {
+  SOIL_DRY: 2500,          // pump fires when raw < 2500 (per doc §3 / firmware)
+  // Calibration endpoints for the wetness %. Direction is encoded here: the
+  // firmware treats LOW raw as dry (< 2500 triggers watering), so dry < wet.
+  // If your probes actually read the other way (higher = drier, as the bench
+  // eval logs suggest), swap these two values — nothing else changes.
+  SOIL_RAW_DRY: 1200,      // raw reading of fully dry soil
+  SOIL_RAW_WET: 3400,      // raw reading of fully wet soil
+  TEMP_MIN: 18, TEMP_MAX: 28,
+  HUM_MIN: 40,  HUM_MAX: 80,
+  WATER_LOW_CM: 10,        // distance > 10 cm → reservoir low, pumps blocked
+  LIGHT_MAX: 1000,         // LED auto: light 0 → 255 bright, ≥1000 → 0
+};
+
+/* ---------- config ---------- */
+const CFG_KEY = "eden.cfg.v1", HIST_KEY = "eden.hist.v1";
+const firstVisit = !localStorage.getItem(CFG_KEY);
+const cfg = Object.assign(
+  { base: "", pollMs: 2500, demo: false, name: "Abdul" },
+  JSON.parse(localStorage.getItem(CFG_KEY) || "{}")
+);
+// A device only ever lives on the LAN, so if this page is served from a public
+// host (github.io, *.app, any real domain) there's nothing to talk to — default
+// to demo on a first visit so a shared link just works. LAN/localhost/CYD keep
+// live mode. An explicit ?demo=0/1 or a saved setting always wins.
+function isPublicHost() {
+  const h = location.hostname;
+  if (!h || h === "localhost" || h === "127.0.0.1" || h.endsWith(".local")) return false;
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(h)) return false;        // bare IP → treat as LAN
+  return true;                                              // has a domain name → public
+}
+const demoParam = new URLSearchParams(location.search).get("demo");
+if (demoParam === "1") cfg.demo = true;
+else if (demoParam === "0") cfg.demo = false;
+else if (firstVisit && !cfg.base && isPublicHost()) cfg.demo = true;
+const saveCfg = () => localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+
+/* ---------- state ---------- */
+let latest = null;          // last good /api/data payload
+let reachable = false;      // CYD reachable this cycle
+let failStreak = 0;
+let hist = loadHist();      // [{t, soil_a, soil_b, light, temp, humidity, water}]
+const pending = {};         // device → { expect:{field:value,...}, until }
+let pollTimer = null;
+
+function loadHist() {
+  try {
+    const h = JSON.parse(localStorage.getItem(HIST_KEY) || "[]");
+    const cutoff = Date.now() - 24 * 3600e3;
+    return Array.isArray(h) ? h.filter(s => s.t > cutoff) : [];
+  } catch { return []; }
+}
+let lastPersist = 0;
+function persistHist() {
+  if (Date.now() - lastPersist < 30e3) return;
+  lastPersist = Date.now();
+  // thin to ≥20s spacing before persisting so storage stays small
+  const out = []; let prev = 0;
+  for (const s of hist) if (s.t - prev >= 20e3) { out.push(s); prev = s.t; }
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(out.slice(-2000))); } catch {}
+}
+
+/* ---------- demo device ---------- */
+const demo = (() => {
+  const st = {
+    soil_a: 2100, soil_b: 2900, light: 420, temp: 23.1, humidity: 61, water: 6.5,
+    pumpA_auto: true, pumpB_auto: true, fan_auto: true, led_auto: true,
+    pumpA_on: false, pumpB_on: false, fan_on: false, led_brightness: 0,
+  };
+  const drift = (v, amt, min, max) => Math.min(max, Math.max(min, v + (Math.random() - 0.5) * amt));
+  function tick() {
+    st.temp = drift(st.temp + (st.fan_on ? -0.06 : 0.03), 0.3, 15, 33);
+    st.humidity = drift(st.humidity + (st.fan_on ? -0.2 : 0.12), 1.2, 30, 92);
+    st.light = Math.round(drift(st.light, 60, 0, 1400));
+    // watering pushes the reading up toward "wet"; drying drifts it down
+    st.soil_a = Math.round(drift(st.soil_a + (st.pumpA_on ? 35 : -1.5), 25, 1200, 3400));
+    st.soil_b = Math.round(drift(st.soil_b + (st.pumpB_on ? 35 : -1.5), 25, 1200, 3400));
+    st.water = +drift(st.water + (st.pumpA_on || st.pumpB_on ? 0.02 : 0), 0.05, 3, 14).toFixed(1);
+    const waterLow = st.water > TH.WATER_LOW_CM;
+    if (st.pumpA_auto) st.pumpA_on = st.soil_a < TH.SOIL_DRY && !waterLow;
+    if (st.pumpB_auto) st.pumpB_on = st.soil_b < TH.SOIL_DRY && !waterLow;
+    if (st.fan_auto) st.fan_on = st.temp < TH.TEMP_MIN || st.temp > TH.TEMP_MAX || st.humidity < TH.HUM_MIN || st.humidity > TH.HUM_MAX;
+    if (st.led_auto) st.led_brightness = Math.max(0, Math.min(255, Math.round(255 * (1 - st.light / TH.LIGHT_MAX))));
+    return { ...st, temp: +st.temp.toFixed(1), humidity: +st.humidity.toFixed(1), online: true };
+  }
+  function control(p) {
+    const d = p.get("device"), mode = p.get("mode");
+    if (d === "led") { st.led_auto = mode === "auto"; if (mode === "manual") st.led_brightness = +p.get("brightness") || 0; }
+    else { st[d + "_auto"] = mode === "auto"; if (mode === "manual") st[d + "_on"] = p.get("state") === "on"; }
+  }
+  return { tick, control };
+})();
+
+/* ---------- networking ---------- */
+const base = () => cfg.base.replace(/\/+$/, "");
+async function fetchData() {
+  if (cfg.demo) return demo.tick();
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const r = await fetch(base() + "/api/data", { signal: ctrl.signal, cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } finally { clearTimeout(to); }
+}
+async function sendControl(params) {
+  if (cfg.demo) { demo.control(new URLSearchParams(params)); return true; }
+  try {
+    const r = await fetch(base() + "/control?" + new URLSearchParams(params), { cache: "no-store" });
+    return r.ok;
+  } catch { return false; }
+}
+
+/* ---------- poll loop ---------- */
+async function poll() {
+  try {
+    const d = await fetchData();
+    latest = d; reachable = true; failStreak = 0;
+    hist.push({ t: Date.now(), soil_a: d.soil_a, soil_b: d.soil_b, light: d.light, temp: d.temp, humidity: d.humidity, water: d.water });
+    if (hist.length > 4000) hist = hist.slice(-3000);
+    persistHist();
+  } catch {
+    failStreak++;
+    if (failStreak >= 2) reachable = false;
+  }
+  render();
+  pollTimer = setTimeout(poll, cfg.pollMs);
+}
+function restart() { clearTimeout(pollTimer); failStreak = 0; poll(); }
+
+/* ---------- derived values ---------- */
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const wetPct = raw => clamp(Math.round(100 * (raw - TH.SOIL_RAW_DRY) / (TH.SOIL_RAW_WET - TH.SOIL_RAW_DRY)), 0, 100);
+const bandScore = (v, lo, hi, falloff) => v >= lo && v <= hi ? 100 : clamp(100 - (v < lo ? lo - v : v - hi) / falloff * 100, 0, 100);
+
+function moodOf(d) {
+  const soil = (bandScore(wetPct(d.soil_a), 35, 75, 40) + bandScore(wetPct(d.soil_b), 35, 75, 40)) / 2;
+  const hum  = bandScore(d.humidity, TH.HUM_MIN, TH.HUM_MAX, 25);
+  const temp = bandScore(d.temp, TH.TEMP_MIN, TH.TEMP_MAX, 8);
+  const effLight = Math.max(d.light, (d.led_brightness / 255) * TH.LIGHT_MAX); // LED compensates darkness
+  const light = clamp(effLight / 300 * 100, 0, 100);
+  const score = Math.round(soil * .4 + hum * .3 + temp * .2 + light * .1);
+  const state = score >= 80 ? { lbl: "Happy", cls: "good", css: "--good" }
+              : score >= 60 ? { lbl: "Okay", cls: "accent", css: "--accent" }
+              : score >= 40 ? { lbl: "Struggling", cls: "warn", css: "--warn" }
+              : { lbl: "Dying", cls: "crit", css: "--critical" };
+  const worst = [];
+  if (soil < 70) worst.push("soil moisture is off target");
+  if (hum < 70) worst.push(`humidity ${d.humidity < TH.HUM_MIN ? "low" : "high"} (${d.humidity.toFixed(0)}%)`);
+  if (temp < 70) worst.push(`temperature ${d.temp < TH.TEMP_MIN ? "low" : "high"} (${d.temp.toFixed(1)}°C)`);
+  if (d.water > TH.WATER_LOW_CM) worst.push("reservoir is low");
+  return { score, state, worst };
+}
+
+/* ---------- definitions ---------- */
+const ZONES = [
+  { key: "soil_a", name: "Zone A", onKey: "pumpA_on" },
+  { key: "soil_b", name: "Zone B", onKey: "pumpB_on" },
+];
+const ENV_IC = {
+  temp:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13.5V5a2 2 0 1 1 4 0v8.5a4.5 4.5 0 1 1-4 0Z"/></svg>',
+  hum:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5C15 7.5 18 10.8 18 14a6 6 0 1 1-12 0c0-3.2 3-6.5 6-10.5Z"/></svg>',
+  light: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5 5l1.8 1.8M17.2 17.2 19 19M19 5l-1.8 1.8M6.8 17.2 5 19"/></svg>',
+  water: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3.5 8c1.5 1.2 3.5 1.2 5 0s3.5-1.2 5 0 3.5 1.2 5 0M3.5 13c1.5 1.2 3.5 1.2 5 0s3.5-1.2 5 0 3.5 1.2 5 0M3.5 18c1.5 1.2 3.5 1.2 5 0s3.5-1.2 5 0 3.5 1.2 5 0"/></svg>',
+};
+const ENV_TINT = {
+  temp:  "background:rgba(232,154,138,.14);color:#e89a8a",
+  hum:   "background:rgba(138,184,232,.14);color:#8ab8e8",
+  light: "background:rgba(232,199,106,.14);color:#e8c76a",
+  water: "background:rgba(127,209,192,.14);color:#7fd1c0",
+};
+const ENV = [
+  { key: "temp", label: "Temperature", ic: ENV_IC.temp, tint: ENV_TINT.temp, fmt: d => [d.temp.toFixed(1), "°C"],
+    chip: d => d.temp < TH.TEMP_MIN ? ["warn", "Cold"] : d.temp > TH.TEMP_MAX ? ["warn", "Hot"] : ["good", "Optimal"] },
+  { key: "humidity", label: "Air humidity", ic: ENV_IC.hum, tint: ENV_TINT.hum, fmt: d => [d.humidity.toFixed(0), "%"],
+    chip: d => d.humidity < TH.HUM_MIN ? ["warn", "Low"] : d.humidity > TH.HUM_MAX ? ["warn", "High"] : ["good", "Optimal"] },
+  { key: "light", label: "Ambient light", ic: ENV_IC.light, tint: ENV_TINT.light, fmt: d => [d.light, ""],
+    chip: d => d.light < 200 ? ["plain", "Dark"] : d.light < 700 ? ["plain", "Dim"] : ["plain", "Bright"] },
+  { key: "water", label: "Reservoir", ic: ENV_IC.water, tint: ENV_TINT.water, fmt: d => [d.water.toFixed(1), "cm"],
+    chip: d => d.water > TH.WATER_LOW_CM ? ["serious", "Low"] : ["good", "Filled"] },
+];
+const TRENDS = [
+  { key: "temp", longLabel: "Temperature", ic: ENV_IC.temp, tint: ENV_TINT.temp, fmt: v => v.toFixed(1) + "°C" },
+  { key: "humidity", longLabel: "Humidity", ic: ENV_IC.hum, tint: ENV_TINT.hum, fmt: v => v.toFixed(0) + "%" },
+  { key: "light", longLabel: "Light", ic: ENV_IC.light, tint: ENV_TINT.light, fmt: v => "" + v },
+  { key: "water", longLabel: "Reservoir", ic: ENV_IC.water, tint: ENV_TINT.water, fmt: v => v.toFixed(1) + " cm" },
+];
+const SOIL_TIP = v => wetPct(v) + "% wet (raw " + v + ")";
+
+function pumpWhy(d, z) {
+  const on = d["pump" + z + "_on"], dry = d["soil_" + z.toLowerCase()] < TH.SOIL_DRY, low = d.water > TH.WATER_LOW_CM;
+  if (on) return "Auto: watering — Zone " + z + " reads dry";
+  if (dry && low) return "Auto: paused — reservoir low blocks watering";
+  return "Auto: idle — soil moisture OK";
+}
+function fanWhy(d) {
+  if (!d.fan_on) return "Auto: idle — climate in comfort band";
+  const r = [];
+  if (d.temp < TH.TEMP_MIN) r.push("temp low"); if (d.temp > TH.TEMP_MAX) r.push("temp high");
+  if (d.humidity < TH.HUM_MIN) r.push("humidity low"); if (d.humidity > TH.HUM_MAX) r.push("humidity high");
+  return "Auto: running — " + (r.join(", ") || "climate out of range");
+}
+const IC = {
+  drop: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.5C15 7.5 18 10.8 18 14a6 6 0 1 1-12 0c0-3.2 3-6.5 6-10.5Z"/></svg>',
+  fan:  '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="2.2"/><path d="M12 9.8C12 5 10 4 7.5 4.5 5.5 5 5.5 8 8 9.4M14.2 12c4.8 0 5.8-2 5.3-4.5-.5-2-3.5-2-4.9.5M12 14.2c0 4.8 2 5.8 4.5 5.3 2-.5 2-3.5-.5-4.9M9.8 12c-4.8 0-5.8 2-5.3 4.5.5 2 3.5 2 4.9-.5"/></svg>',
+  bulb: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21h6M10 18h4M12 3a6 6 0 0 0-3.5 10.9c.8.6 1.5 1.3 1.5 2.1h4c0-.8.7-1.5 1.5-2.1A6 6 0 0 0 12 3Z"/></svg>',
+};
+const CONTROLS = [
+  { dev: "pumpA", name: "Pump A", ic: IC.drop, onKey: "pumpA_on", autoKey: "pumpA_auto", why: d => pumpWhy(d, "A") },
+  { dev: "pumpB", name: "Pump B", ic: IC.drop, onKey: "pumpB_on", autoKey: "pumpB_auto", why: d => pumpWhy(d, "B") },
+  { dev: "fan",   name: "Fan",    ic: IC.fan,  onKey: "fan_on",   autoKey: "fan_auto",   why: fanWhy },
+  { dev: "led",   name: "Grow light", ic: IC.bulb, led: true, autoKey: "led_auto",
+    why: d => "Auto: brightness follows ambient light (" + Math.round(d.led_brightness / 2.55) + "% now)" },
+];
+
+/* ---------- build static DOM ---------- */
+const $ = id => document.getElementById(id);
+
+for (const z of ZONES) {
+  const el = document.createElement("div");
+  el.className = "card zone"; el.id = "zone_" + z.key; el.tabIndex = 0;
+  el.innerHTML = `
+    <div class="z-name">${z.name}</div>
+    <div class="z-sub">Soil moisture</div>
+    <div class="z-val"><span class="v">–</span><small>% wet</small></div>
+    <svg class="spark" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <div class="meter"><i style="width:0%"></i></div>
+    <div class="z-foot"><span class="chip plain z-chip"><span class="dot"></span><span class="c-lbl">–</span></span><span class="z-pct">–</span></div>`;
+  $("zoneGrid").appendChild(el);
+  attachHover(el.querySelector("svg"), () => windowPts(z.key), SOIL_TIP);
+}
+
+for (const e of ENV) {
+  const el = document.createElement("div");
+  el.className = "env"; el.id = "env_" + e.key;
+  el.innerHTML = `
+    <div class="e-top"><span class="e-ic" style="${e.tint}">${e.ic}</span><span class="e-label">${e.label}</span></div>
+    <div class="e-val"><span class="v">–</span><small class="u"></small></div>
+    <span class="chip plain"><span class="dot"></span><span class="c-lbl">–</span></span>`;
+  $("envGrid").appendChild(el);
+}
+
+for (const t of TRENDS) {
+  const el = document.createElement("div");
+  el.className = "card tcard"; el.id = "tc_" + t.key;
+  el.innerHTML = `
+    <div class="tc-top">
+      <span class="tc-name"><span class="tc-ic" style="${t.tint}">${t.ic}</span>${t.longLabel}</span>
+      <span class="delta" id="tcD_${t.key}"></span>
+    </div>
+    <div class="tc-val" id="tcV_${t.key}">–</div>
+    <svg class="tbars" id="tcS_${t.key}" preserveAspectRatio="none"></svg>`;
+  $("trendGrid").appendChild(el);
+  attachHover(el.querySelector("svg"), () => windowPts(t.key, 24), t.fmt);
+}
+
+for (const c of CONTROLS) {
+  const el = document.createElement("div");
+  el.className = "card ctl"; el.id = "ctl_" + c.dev;
+  el.innerHTML = `
+    <div class="c-head">
+      <span class="c-ic">${c.ic}</span>
+      <div><div class="c-name">${c.name}</div><div class="c-state">–</div></div>
+    </div>
+    <div class="seg" role="group" aria-label="${c.name} mode">
+      <button data-mode="auto" aria-pressed="false">Auto</button>
+      <button data-mode="manual" aria-pressed="false">Manual</button>
+    </div>
+    <div class="rowline">
+      ${c.led
+        ? `<div class="led-row">
+             <input type="range" class="slider" min="0" max="255" step="1" value="0" aria-label="Grow light brightness">
+             <span class="led-val">–</span></div>`
+        : `<span class="why">–</span>
+           <input type="checkbox" class="switch" role="switch" aria-label="${c.name} power">`}
+    </div>`;
+  $("ctlGrid").appendChild(el);
+
+  el.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+    const mode = b.dataset.mode;
+    if (mode === "auto") {
+      markPending(c.dev, { [c.autoKey]: true });
+      sendControl({ device: c.dev, mode: "auto" });
+    } else {
+      // switch to manual, freezing the current state
+      const p = { device: c.dev, mode: "manual" };
+      if (c.led) p.brightness = latest ? latest.led_brightness : 0;
+      else p.state = latest && latest[c.onKey] ? "on" : "off";
+      markPending(c.dev, { [c.autoKey]: false });
+      sendControl(p);
+    }
+    render();
+  }));
+
+  if (c.led) {
+    const sl = el.querySelector(".slider");
+    let deb;
+    sl.addEventListener("input", () => {
+      el.querySelector(".led-val").textContent = Math.round(sl.value / 2.55) + "%";
+      markPending("led", { led_auto: false, led_brightness: +sl.value });
+      clearTimeout(deb);
+      deb = setTimeout(() => sendControl({ device: "led", mode: "manual", brightness: sl.value }), 250);
+    });
+  } else {
+    el.querySelector(".switch").addEventListener("change", e => {
+      markPending(c.dev, { [c.autoKey]: false, [c.onKey]: e.target.checked });
+      sendControl({ device: c.dev, mode: "manual", state: e.target.checked ? "on" : "off" });
+      render();
+    });
+  }
+}
+
+/* bottom nav */
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.id === "tab-" + b.dataset.tab));
+  if (b.dataset.tab === "history") renderHistTable();
+  try { history.replaceState(null, "", b.dataset.tab === "home" ? location.pathname + location.search : "#" + b.dataset.tab); } catch {}
+  window.scrollTo({ top: 0 });
+}));
+{
+  const h = location.hash.slice(1);
+  if (h) document.querySelector(`nav button[data-tab="${h}"]`)?.click();
+}
+
+function markPending(dev, expect) {
+  pending[dev] = { expect, until: Date.now() + 7000 };
+}
+function effective(d) {
+  // overlay optimistic expectations onto the latest snapshot
+  const out = { ...d };
+  for (const [dev, p] of Object.entries(pending)) {
+    if (Date.now() > p.until) { delete pending[dev]; continue; }
+    const confirmed = Object.entries(p.expect).every(([k, v]) => d[k] === v);
+    if (confirmed) { delete pending[dev]; continue; }
+    Object.assign(out, p.expect);
+    out["_pending_" + dev] = true;
+  }
+  return out;
+}
+
+/* ---------- charts (smooth area line, gradient wash, accent end dot) ---------- */
+let gradSeq = 0;
+function chart(svg, pts, w, h) {
+  if (pts.length < 2) { svg.innerHTML = ""; return; }
+  let lo = Infinity, hi = -Infinity;
+  for (const p of pts) { if (p.v < lo) lo = p.v; if (p.v > hi) hi = p.v; }
+  if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
+  const pad = (hi - lo) * 0.14; lo -= pad; hi += pad;
+  const X = i => (i / (pts.length - 1)) * (w - 10) + 3;
+  const Y = v => h - 5 - ((v - lo) / (hi - lo)) * (h - 10);
+  const P = pts.map((p, i) => [X(i), Y(p.v)]);
+  // Catmull-Rom → cubic bezier for the soft botanical curve
+  let dLine = `M ${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[i - 1] || P[i], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2] || p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    dLine += ` C ${c1[0].toFixed(1)} ${c1[1].toFixed(1)}, ${c2[0].toFixed(1)} ${c2[1].toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  const dArea = dLine + ` L ${P[P.length - 1][0].toFixed(1)} ${h - 2} L ${P[0][0].toFixed(1)} ${h - 2} Z`;
+  const [ex, ey] = P[P.length - 1];
+  const gid = "g" + (gradSeq++);
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.innerHTML =
+    `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+       <stop offset="0" stop-color="#6fa22e" stop-opacity="0.24"/>
+       <stop offset="1" stop-color="#6fa22e" stop-opacity="0.02"/>
+     </linearGradient></defs>` +
+    `<path d="${dArea}" fill="url(#${gid})"/>` +
+    `<path d="${dLine}" fill="none" stroke="var(--line)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` +
+    `<line class="xh" x1="0" x2="0" y1="3" y2="${h - 3}" stroke="rgba(30,45,15,.18)" stroke-width="1" visibility="hidden"/>` +
+    `<circle class="hover-dot" r="4.5" fill="var(--line)" stroke="var(--card)" stroke-width="2" visibility="hidden"/>` +
+    `<circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="4.5" fill="var(--line)" stroke="var(--card)" stroke-width="2"/>`;
+  svg._geom = { lo, hi, w, h };
+}
+
+/* ---------- bar chart (Trends) — vertical bars, lime gradient, latest emphasized ---------- */
+function barchart(svg, pts, w, h) {
+  if (!pts.length) { svg.innerHTML = ""; svg._geom = null; return; }
+  let lo = Infinity, hi = -Infinity;
+  for (const p of pts) { if (p.v < lo) lo = p.v; if (p.v > hi) hi = p.v; }
+  const span = hi - lo || 1;
+  const base = lo - span * 0.55;          // baseline below min so bars vary in height
+  const top = hi + span * 0.12;
+  const n = pts.length;
+  const slot = w / n;
+  const gap = Math.min(4, slot * 0.28);
+  const bw = Math.max(2, Math.min(slot - gap, 7));   // thin bars, capped so they never look chunky
+  const Y = v => h - 2 - ((v - base) / (top - base)) * (h - 6);
+  const gid = "bg" + (gradSeq++);
+  let bars = "";
+  pts.forEach((p, i) => {
+    const x = i * slot + (slot - bw) / 2;
+    const y = Y(p.v);
+    const bottom = h - 2;
+    const r = Math.min(bw / 2, Math.max(0, bottom - y));
+    const last = i === n - 1;
+    const d = `M${x.toFixed(1)} ${bottom} L${x.toFixed(1)} ${(y + r).toFixed(1)} Q${x.toFixed(1)} ${y.toFixed(1)} ${(x + r).toFixed(1)} ${y.toFixed(1)} L${(x + bw - r).toFixed(1)} ${y.toFixed(1)} Q${(x + bw).toFixed(1)} ${y.toFixed(1)} ${(x + bw).toFixed(1)} ${(y + r).toFixed(1)} L${(x + bw).toFixed(1)} ${bottom} Z`;
+    bars += `<path d="${d}" fill="${last ? "var(--line)" : `url(#${gid})`}"/>`;
+  });
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.innerHTML =
+    `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+       <stop offset="0" stop-color="var(--bar2)"/>
+       <stop offset="1" stop-color="var(--bar1)"/>
+     </linearGradient></defs>` +
+    bars +
+    `<line class="xh" x1="0" x2="0" y1="2" y2="${h - 2}" stroke="rgba(30,45,15,.16)" stroke-width="1" visibility="hidden"/>`;
+  svg._geom = { lo: base, hi: top, w, h };
+}
+
+const SPARK_WINDOW = 30 * 60e3; // last 30 min
+function windowPts(key, maxN = 60) {
+  const cutoff = Date.now() - SPARK_WINDOW;
+  const pts = [];
+  for (const s of hist) if (s.t > cutoff && s[key] != null && !Number.isNaN(s[key])) pts.push({ t: s.t, v: s[key] });
+  // downsample to ≤maxN points for rendering
+  if (pts.length > maxN) {
+    const step = pts.length / maxN, out = [];
+    for (let i = 0; i < maxN; i++) out.push(pts[Math.floor(i * step)]);
+    out[out.length - 1] = pts[pts.length - 1];
+    return out;
+  }
+  return pts;
+}
+
+const tip = $("tip");
+function attachHover(svg, getPts, fmt) {
+  svg.addEventListener("pointermove", e => {
+    const pts = getPts(), g = svg._geom;
+    if (!pts || pts.length < 2 || !g) return;
+    const r = svg.getBoundingClientRect();
+    const fx = clamp((e.clientX - r.left) / r.width, 0, 1);
+    const i = Math.round(fx * (pts.length - 1));
+    const p = pts[i];
+    const x = (i / (pts.length - 1)) * (g.w - 10) + 3;
+    const y = g.h - 5 - ((p.v - g.lo) / (g.hi - g.lo)) * (g.h - 10);
+    const xh = svg.querySelector(".xh"), dot = svg.querySelector(".hover-dot");
+    if (xh) { xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.setAttribute("visibility", "visible"); }
+    if (dot) { dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.setAttribute("visibility", "visible"); }
+    tip.style.display = "block";
+    tip.innerHTML = `${fmt(p.v)}<small>${new Date(p.t).toLocaleTimeString()}</small>`;
+    tip.style.left = clamp(e.clientX + 12, 4, innerWidth - 140) + "px";
+    tip.style.top = (e.clientY - 44) + "px";
+  });
+  svg.addEventListener("pointerleave", () => {
+    tip.style.display = "none";
+    const xh = svg.querySelector(".xh"), dot = svg.querySelector(".hover-dot");
+    if (xh) xh.setAttribute("visibility", "hidden");
+    if (dot) dot.setAttribute("visibility", "hidden");
+  });
+}
+
+/* ---------- render ---------- */
+function setChip(el, cls, lbl) {
+  el.className = el.className.replace(/\b(good|warn|serious|crit|plain|accent)\b/g, "").trim() + " " + cls;
+  el.querySelector(".c-lbl, span:last-child").textContent = lbl;
+}
+
+function render() {
+  const havingData = !!latest;
+  const hubOnline = havingData && latest.online !== false;
+  const live = reachable && hubOnline;
+  const offline = !cfg.demo && !reachable;
+  const stale = !cfg.demo && reachable && !hubOnline;
+
+  // banner
+  const banner = $("banner");
+  banner.classList.toggle("show", offline || stale);
+  banner.classList.toggle("stale", stale);
+  $("bDemo").hidden = !offline;
+  if (offline) {
+    $("bTitle").textContent = "Can't reach the terrarium";
+    $("bSub").textContent = "Check that you're on the same WiFi and the device address is right (Settings). Readings below are the last known values.";
+  } else if (stale) {
+    $("bTitle").textContent = "Sensor hub offline";
+    $("bSub").textContent = "The display board is reachable but hasn't heard from the sensor hub for >8 s. Readings are stale and commands may not apply.";
+  }
+
+  $("fSrc").textContent = srcLabel();
+  if (!havingData) return;
+  const d = effective(latest);
+
+  // hero stats
+  const m = moodOf(d);
+  $("hHealth").textContent = m.score;
+  $("hHum").textContent = d.humidity.toFixed(0) + "%";
+  $("hSoil").textContent = Math.round((wetPct(d.soil_a) + wetPct(d.soil_b)) / 2) + "%";
+  const fullness = clamp(Math.round((14 - d.water) / (14 - 3) * 100), 0, 100);
+  $("hResBar").style.width = fullness + "%";
+  $("hResVal").textContent = d.water.toFixed(1) + " cm";
+  $("heroMeta").textContent = m.worst.length
+    ? m.worst.join(" · ")
+    : `${m.state.lbl} · all parameters within range`;
+
+  // zones
+  for (const z of ZONES) {
+    const el = $("zone_" + z.key);
+    const raw = d[z.key], pct = wetPct(raw);
+    el.querySelector(".v").textContent = pct;
+    el.querySelector(".meter i").style.width = pct + "%";
+    el.querySelector(".z-pct").textContent = d[z.onKey] ? "Watering…" : pct + "%";
+    setChip(el.querySelector(".z-chip"), raw < TH.SOIL_DRY ? "warn" : "good", raw < TH.SOIL_DRY ? "Dry" : "OK");
+    el.style.opacity = (offline || stale) ? 0.55 : 1;
+    chart(el.querySelector("svg.spark"), windowPts(z.key), 300, 44);
+  }
+
+  // environment
+  let envBad = null;
+  for (const e of ENV) {
+    const el = $("env_" + e.key);
+    const [v, u] = e.fmt(d);
+    el.querySelector(".v").textContent = v;
+    el.querySelector(".u").textContent = u;
+    const [cls, lbl] = e.chip(d);
+    setChip(el.querySelector(".chip"), cls, lbl);
+    if (!envBad && (cls === "warn" || cls === "serious")) envBad = e.label.toLowerCase();
+    el.style.opacity = (offline || stale) ? 0.55 : 1;
+  }
+  setChip($("envChip"), envBad ? "warn" : "good", envBad ? "Check " + envBad : "Optimal");
+
+  // trends — one card per metric
+  for (const t of TRENDS) {
+    const pts = windowPts(t.key, 44);
+    barchart($("tcS_" + t.key), pts, 340, 58);
+    if (pts.length) {
+      const first = pts[0].v, last = pts[pts.length - 1].v, dv = last - first;
+      $("tcV_" + t.key).textContent = t.fmt(last);
+      const arrow = dv > 0.05 ? "↑" : dv < -0.05 ? "↓" : "→";
+      const digits = t.key === "light" ? 0 : 1;
+      $("tcD_" + t.key).textContent = pts.length >= 2 ? `${arrow} ${Math.abs(dv).toFixed(digits)}` : "";
+    }
+  }
+
+  // control cards
+  for (const c of CONTROLS) {
+    const el = $("ctl_" + c.dev);
+    const isAuto = !!d[c.autoKey];
+    const isPending = !!d["_pending_" + c.dev];
+    el.classList.toggle("pending", isPending);
+    el.classList.toggle("disabled-zone", offline || stale);
+    el.querySelectorAll(".seg button").forEach(b =>
+      b.setAttribute("aria-pressed", String((b.dataset.mode === "auto") === isAuto)));
+    const stateEl = el.querySelector(".c-state");
+    if (c.led) {
+      const pct = Math.round(d.led_brightness / 2.55);
+      stateEl.textContent = (d.led_brightness > 0 ? `On · ${pct}%` : "Off") + (isAuto ? " · auto" : " · manual") + (isPending ? " · syncing…" : "");
+      stateEl.classList.toggle("on", d.led_brightness > 0);
+      const sl = el.querySelector(".slider");
+      if (document.activeElement !== sl) sl.value = d.led_brightness;
+      sl.disabled = isAuto;
+      el.querySelector(".led-val").textContent = pct + "%";
+      el.querySelector(".led-row").title = isAuto ? "Switch to Manual to set brightness" : "";
+    } else {
+      const on = !!d[c.onKey];
+      stateEl.textContent = (on ? "Running" : "Off") + (isAuto ? " · auto" : " · manual") + (isPending ? " · syncing…" : "");
+      stateEl.classList.toggle("on", on);
+      const sw = el.querySelector(".switch");
+      sw.checked = on;
+      sw.disabled = isAuto;
+      el.querySelector(".why").textContent = isAuto ? c.why(d) : (on ? "Manual override — running" : "Manual override — off");
+    }
+  }
+
+  if ($("tab-history").classList.contains("active")) renderHistTable();
+  $("fLast").textContent = "Last update " + new Date().toLocaleTimeString();
+}
+function srcLabel() {
+  return cfg.demo ? "Simulated data (demo mode)" : "Device: " + (cfg.base || location.host || "same origin");
+}
+
+/* ---------- history table ---------- */
+function renderHistTable() {
+  const tb = $("histTbl").querySelector("tbody");
+  const rows = hist.slice(-80).reverse();
+  tb.innerHTML = rows.map(s =>
+    `<tr><td>${new Date(s.t).toLocaleTimeString()}</td><td>${s.soil_a}</td><td>${s.soil_b}</td>` +
+    `<td>${(+s.temp).toFixed(1)}</td><td>${(+s.humidity).toFixed(0)}</td><td>${s.light}</td><td>${(+s.water).toFixed(1)}</td></tr>`
+  ).join("") || `<tr><td colspan="7" style="text-align:center;color:var(--muted)">No readings yet</td></tr>`;
+}
+
+/* ---------- settings ---------- */
+function fillSettings() {
+  $("fName").value = cfg.name;
+  $("fBase").value = cfg.base;
+  $("fPoll").value = cfg.pollMs / 1000;
+  $("fDemo").checked = cfg.demo;
+}
+fillSettings();
+$("fSave").addEventListener("click", () => {
+  cfg.name = $("fName").value.trim();
+  cfg.base = $("fBase").value.trim();
+  cfg.pollMs = clamp((+$("fPoll").value || 2.5) * 1000, 1500, 30000);
+  cfg.demo = $("fDemo").checked;
+  saveCfg();
+  setGreeting();
+  latest = null; restart();
+  document.querySelector('nav button[data-tab="home"]').click();
+});
+$("fClear").addEventListener("click", () => {
+  hist = []; localStorage.removeItem(HIST_KEY); render();
+});
+$("bDemo").addEventListener("click", () => {
+  cfg.demo = true; saveCfg(); fillSettings(); latest = null; restart();
+});
+
+/* ---------- greeting (hero title) ---------- */
+function setGreeting() {
+  const h = new Date().getHours();
+  const part = h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  const name = (cfg.name || "").trim();
+  $("heroGreet").textContent = name ? `${part}, ${name}` : part;
+}
+setGreeting();
+
+/* ---------- seed demo history ----------
+   The trend cards show the last 30 min. On a real device that fills in as
+   readings arrive; in demo mode we backfill a plausible 30 min so the charts
+   are dense from the first frame. Re-seed whenever the window is sparse (not
+   just when history is totally empty), so a few stale saved points don't leave
+   thick lonely bars. */
+{
+  const winStart = Date.now() - 30 * 60e3;
+  const winCount = hist.reduce((a, s) => a + (s.t > winStart ? 1 : 0), 0);
+  if (cfg.demo && winCount < 40) {
+    const now = Date.now();
+    let temp = 22.6, hum = 60, light = 420, sa = 2150, sb = 2880;
+    const jit = (v, a) => v + (Math.random() - 0.5) * a;
+    const seeded = [];
+    for (let i = 48; i >= 2; i--) {   // ~28 min of points ending ~80 s ago
+      temp = jit(temp, 0.5); hum = jit(hum, 1.6); light = jit(light, 90);
+      sa = jit(sa, 34); sb = jit(sb, 30);
+      seeded.push({
+        t: now - i * 38e3,
+        soil_a: Math.round(clamp(sa, 1400, 3300)), soil_b: Math.round(clamp(sb, 1400, 3300)),
+        light: Math.round(Math.max(0, light)),
+        temp: +clamp(temp, 17, 30).toFixed(1), humidity: +clamp(hum, 42, 82).toFixed(1),
+        water: 6.5,
+      });
+    }
+    hist = seeded.concat(hist).sort((a, b) => a.t - b.t);
+  }
+}
+
+/* ---------- PWA ---------- */
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+poll();
+</script>
+</body>
+</html>
