@@ -307,7 +307,6 @@
 
   <div class="banner" id="banner" role="alert">
     <div class="b-txt"><b id="bTitle"></b><small id="bSub"></small></div>
-    <button class="btn" id="bDemo" hidden>Try demo mode</button>
   </div>
 
   <!-- ============ HOME ============ -->
@@ -410,10 +409,6 @@
         <input type="number" id="fPoll" min="1.5" max="30" step="0.5">
         <div class="hint">Keep at 1.5 s or above — the sensor hub has request timeouts under load.</div>
       </div>
-      <div class="field check">
-        <label for="fDemo">Demo mode (simulated terrarium)</label>
-        <input type="checkbox" id="fDemo" class="switch">
-      </div>
       <div class="set-actions">
         <button class="btn primary" id="fSave" type="button">Save</button>
         <button class="btn" id="fClear" type="button">Clear history</button>
@@ -449,42 +444,23 @@
      GET /control?device=&mode=[&state=|&brightness=]
    ================================================================ */
 
-/* ---------- thresholds (mirror EDEN_API_Documentation.md §3) ---------- */
+/* ---------- thresholds (mirror esp32s.ino) ---------- */
 const TH = {
-  SOIL_DRY: 2500,          // pump fires when raw < 2500 (per doc §3 / firmware)
-  // Calibration endpoints for the wetness %. Direction is encoded here: the
-  // firmware treats LOW raw as dry (< 2500 triggers watering), so dry < wet.
-  // If your probes actually read the other way (higher = drier, as the bench
-  // eval logs suggest), swap these two values — nothing else changes.
-  SOIL_RAW_DRY: 1200,      // raw reading of fully dry soil
-  SOIL_RAW_WET: 3400,      // raw reading of fully wet soil
+  // The firmware sends soil_a/soil_b already converted to a 0-100% wetness
+  // value (see soilRawToPercent in esp32s.ino) — no raw-ADC conversion needed here.
+  SOIL_DRY: 40,            // % — matches firmware's SOIL_PUMP_ON_PCT (pump fires below this)
   TEMP_MIN: 18, TEMP_MAX: 28,
   HUM_MIN: 40,  HUM_MAX: 80,
-  WATER_LOW_CM: 10,        // distance > 10 cm → reservoir low, pumps blocked
+  WATER_LOW_CM: 4.5,       // distance > 4.5 cm → reservoir low, pumps blocked (empty maxes at ~5.3cm on this tank)
   LIGHT_MAX: 1000,         // LED auto: light 0 → 255 bright, ≥1000 → 0
 };
 
 /* ---------- config ---------- */
-const CFG_KEY = "eden.cfg.v1", HIST_KEY = "eden.hist.v1";
-const firstVisit = !localStorage.getItem(CFG_KEY);
+const CFG_KEY = "eden.cfg.v2", HIST_KEY = "eden.hist.v1";
 const cfg = Object.assign(
-  { base: "", pollMs: 2500, demo: false, name: "Abdul" },
+  { base: "http://192.168.0.188", pollMs: 2500, name: "Abdul" },
   JSON.parse(localStorage.getItem(CFG_KEY) || "{}")
 );
-// A device only ever lives on the LAN, so if this page is served from a public
-// host (github.io, *.app, any real domain) there's nothing to talk to — default
-// to demo on a first visit so a shared link just works. LAN/localhost/CYD keep
-// live mode. An explicit ?demo=0/1 or a saved setting always wins.
-function isPublicHost() {
-  const h = location.hostname;
-  if (!h || h === "localhost" || h === "127.0.0.1" || h.endsWith(".local")) return false;
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(h)) return false;        // bare IP → treat as LAN
-  return true;                                              // has a domain name → public
-}
-const demoParam = new URLSearchParams(location.search).get("demo");
-if (demoParam === "1") cfg.demo = true;
-else if (demoParam === "0") cfg.demo = false;
-else if (firstVisit && !cfg.base && isPublicHost()) cfg.demo = true;
 const saveCfg = () => localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
 
 /* ---------- state ---------- */
@@ -512,41 +488,9 @@ function persistHist() {
   try { localStorage.setItem(HIST_KEY, JSON.stringify(out.slice(-2000))); } catch {}
 }
 
-/* ---------- demo device ---------- */
-const demo = (() => {
-  const st = {
-    soil_a: 2100, soil_b: 2900, light: 420, temp: 23.1, humidity: 61, water: 6.5,
-    pumpA_auto: true, pumpB_auto: true, fan_auto: true, led_auto: true,
-    pumpA_on: false, pumpB_on: false, fan_on: false, led_brightness: 0,
-  };
-  const drift = (v, amt, min, max) => Math.min(max, Math.max(min, v + (Math.random() - 0.5) * amt));
-  function tick() {
-    st.temp = drift(st.temp + (st.fan_on ? -0.06 : 0.03), 0.3, 15, 33);
-    st.humidity = drift(st.humidity + (st.fan_on ? -0.2 : 0.12), 1.2, 30, 92);
-    st.light = Math.round(drift(st.light, 60, 0, 1400));
-    // watering pushes the reading up toward "wet"; drying drifts it down
-    st.soil_a = Math.round(drift(st.soil_a + (st.pumpA_on ? 35 : -1.5), 25, 1200, 3400));
-    st.soil_b = Math.round(drift(st.soil_b + (st.pumpB_on ? 35 : -1.5), 25, 1200, 3400));
-    st.water = +drift(st.water + (st.pumpA_on || st.pumpB_on ? 0.02 : 0), 0.05, 3, 14).toFixed(1);
-    const waterLow = st.water > TH.WATER_LOW_CM;
-    if (st.pumpA_auto) st.pumpA_on = st.soil_a < TH.SOIL_DRY && !waterLow;
-    if (st.pumpB_auto) st.pumpB_on = st.soil_b < TH.SOIL_DRY && !waterLow;
-    if (st.fan_auto) st.fan_on = st.temp < TH.TEMP_MIN || st.temp > TH.TEMP_MAX || st.humidity < TH.HUM_MIN || st.humidity > TH.HUM_MAX;
-    if (st.led_auto) st.led_brightness = Math.max(0, Math.min(255, Math.round(255 * (1 - st.light / TH.LIGHT_MAX))));
-    return { ...st, temp: +st.temp.toFixed(1), humidity: +st.humidity.toFixed(1), online: true };
-  }
-  function control(p) {
-    const d = p.get("device"), mode = p.get("mode");
-    if (d === "led") { st.led_auto = mode === "auto"; if (mode === "manual") st.led_brightness = +p.get("brightness") || 0; }
-    else { st[d + "_auto"] = mode === "auto"; if (mode === "manual") st[d + "_on"] = p.get("state") === "on"; }
-  }
-  return { tick, control };
-})();
-
 /* ---------- networking ---------- */
 const base = () => cfg.base.replace(/\/+$/, "");
 async function fetchData() {
-  if (cfg.demo) return demo.tick();
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), 4000);
   try {
@@ -556,7 +500,6 @@ async function fetchData() {
   } finally { clearTimeout(to); }
 }
 async function sendControl(params) {
-  if (cfg.demo) { demo.control(new URLSearchParams(params)); return true; }
   try {
     const r = await fetch(base() + "/control?" + new URLSearchParams(params), { cache: "no-store" });
     return r.ok;
@@ -582,7 +525,7 @@ function restart() { clearTimeout(pollTimer); failStreak = 0; poll(); }
 
 /* ---------- derived values ---------- */
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const wetPct = raw => clamp(Math.round(100 * (raw - TH.SOIL_RAW_DRY) / (TH.SOIL_RAW_WET - TH.SOIL_RAW_DRY)), 0, 100);
+const wetPct = pct => clamp(Math.round(pct), 0, 100);
 const bandScore = (v, lo, hi, falloff) => v >= lo && v <= hi ? 100 : clamp(100 - (v < lo ? lo - v : v - hi) / falloff * 100, 0, 100);
 
 function moodOf(d) {
@@ -637,7 +580,7 @@ const TRENDS = [
   { key: "light", longLabel: "Light", ic: ENV_IC.light, tint: ENV_TINT.light, fmt: v => "" + v },
   { key: "water", longLabel: "Reservoir", ic: ENV_IC.water, tint: ENV_TINT.water, fmt: v => v.toFixed(1) + " cm" },
 ];
-const SOIL_TIP = v => wetPct(v) + "% wet (raw " + v + ")";
+const SOIL_TIP = v => wetPct(v) + "% wet";
 
 function pumpWhy(d, z) {
   const on = d["pump" + z + "_on"], dry = d["soil_" + z.toLowerCase()] < TH.SOIL_DRY, low = d.water > TH.WATER_LOW_CM;
@@ -914,14 +857,13 @@ function render() {
   const havingData = !!latest;
   const hubOnline = havingData && latest.online !== false;
   const live = reachable && hubOnline;
-  const offline = !cfg.demo && !reachable;
-  const stale = !cfg.demo && reachable && !hubOnline;
+  const offline = !reachable;
+  const stale = reachable && !hubOnline;
 
   // banner
   const banner = $("banner");
   banner.classList.toggle("show", offline || stale);
   banner.classList.toggle("stale", stale);
-  $("bDemo").hidden = !offline;
   if (offline) {
     $("bTitle").textContent = "Can't reach the terrarium";
     $("bSub").textContent = "Check that you're on the same WiFi and the device address is right (Settings). Readings below are the last known values.";
@@ -939,7 +881,9 @@ function render() {
   $("hHealth").textContent = m.score;
   $("hHum").textContent = d.humidity.toFixed(0) + "%";
   $("hSoil").textContent = Math.round((wetPct(d.soil_a) + wetPct(d.soil_b)) / 2) + "%";
-  const fullness = clamp(Math.round((14 - d.water) / (14 - 3) * 100), 0, 100);
+  // Empty measured at ~5.3cm on this tank; full-tank reading not yet measured —
+  // 1cm assumed as a placeholder full point until calibrated against the real value.
+  const fullness = clamp(Math.round((5.3 - d.water) / (5.3 - 1) * 100), 0, 100);
   $("hResBar").style.width = fullness + "%";
   $("hResVal").textContent = d.water.toFixed(1) + " cm";
   $("heroMeta").textContent = m.worst.length
@@ -1019,7 +963,7 @@ function render() {
   $("fLast").textContent = "Last update " + new Date().toLocaleTimeString();
 }
 function srcLabel() {
-  return cfg.demo ? "Simulated data (demo mode)" : "Device: " + (cfg.base || location.host || "same origin");
+  return "Device: " + (cfg.base || location.host || "same origin");
 }
 
 /* ---------- history table ---------- */
@@ -1037,14 +981,12 @@ function fillSettings() {
   $("fName").value = cfg.name;
   $("fBase").value = cfg.base;
   $("fPoll").value = cfg.pollMs / 1000;
-  $("fDemo").checked = cfg.demo;
 }
 fillSettings();
 $("fSave").addEventListener("click", () => {
   cfg.name = $("fName").value.trim();
   cfg.base = $("fBase").value.trim();
   cfg.pollMs = clamp((+$("fPoll").value || 2.5) * 1000, 1500, 30000);
-  cfg.demo = $("fDemo").checked;
   saveCfg();
   setGreeting();
   latest = null; restart();
@@ -1052,9 +994,6 @@ $("fSave").addEventListener("click", () => {
 });
 $("fClear").addEventListener("click", () => {
   hist = []; localStorage.removeItem(HIST_KEY); render();
-});
-$("bDemo").addEventListener("click", () => {
-  cfg.demo = true; saveCfg(); fillSettings(); latest = null; restart();
 });
 
 /* ---------- greeting (hero title) ---------- */
@@ -1065,35 +1004,6 @@ function setGreeting() {
   $("heroGreet").textContent = name ? `${part}, ${name}` : part;
 }
 setGreeting();
-
-/* ---------- seed demo history ----------
-   The trend cards show the last 30 min. On a real device that fills in as
-   readings arrive; in demo mode we backfill a plausible 30 min so the charts
-   are dense from the first frame. Re-seed whenever the window is sparse (not
-   just when history is totally empty), so a few stale saved points don't leave
-   thick lonely bars. */
-{
-  const winStart = Date.now() - 30 * 60e3;
-  const winCount = hist.reduce((a, s) => a + (s.t > winStart ? 1 : 0), 0);
-  if (cfg.demo && winCount < 40) {
-    const now = Date.now();
-    let temp = 22.6, hum = 60, light = 420, sa = 2150, sb = 2880;
-    const jit = (v, a) => v + (Math.random() - 0.5) * a;
-    const seeded = [];
-    for (let i = 48; i >= 2; i--) {   // ~28 min of points ending ~80 s ago
-      temp = jit(temp, 0.5); hum = jit(hum, 1.6); light = jit(light, 90);
-      sa = jit(sa, 34); sb = jit(sb, 30);
-      seeded.push({
-        t: now - i * 38e3,
-        soil_a: Math.round(clamp(sa, 1400, 3300)), soil_b: Math.round(clamp(sb, 1400, 3300)),
-        light: Math.round(Math.max(0, light)),
-        temp: +clamp(temp, 17, 30).toFixed(1), humidity: +clamp(hum, 42, 82).toFixed(1),
-        water: 6.5,
-      });
-    }
-    hist = seeded.concat(hist).sort((a, b) => a.t - b.t);
-  }
-}
 
 /* ---------- PWA ---------- */
 if ("serviceWorker" in navigator && window.isSecureContext) {

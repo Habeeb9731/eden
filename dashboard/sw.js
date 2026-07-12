@@ -3,7 +3,7 @@
  * Device endpoints (/api/data, /control, /data): network-only, never cached —
  * a cached sensor snapshot or control ack would silently lie about live state.
  */
-const VERSION = "eden-v6";
+const VERSION = "eden-v10";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png", "./fonts/inter.woff2", "./fonts/inter-tight.woff2"];
 
 self.addEventListener("install", (e) => {

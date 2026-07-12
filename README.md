@@ -5,13 +5,6 @@ university Interactive Systems project (Team 17, Saarland University). It shows
 live sensor readings, per-zone soil trends, and lets you control the pumps, fan
 and grow light. Vanilla HTML/CSS/JS, zero dependencies, zero CDN calls.
 
-## 🌿 Live demo
-
-**https://habeeb9731.github.io/eden/**
-
-Runs in **demo mode** (a fully simulated terrarium with working closed-loop
-pump/fan/light behaviour), so every control is interactive without any hardware.
-
 ## What it does
 
 - Photo hero with a live greeting and a **liquid-glass** health panel (health,
@@ -29,15 +22,21 @@ pump/fan/light behaviour), so every control is interactive without any hardware.
 ```bash
 cd dashboard
 python3 -m http.server 8080
-# open http://localhost:8080/?demo=1
+# open http://localhost:8080/
 ```
+
+By default the dashboard talks directly to the ESP32S sensor hub at
+`http://192.168.0.188`. Change the address in **Settings** if your device gets
+a different IP.
 
 ## Using it with the real terrarium
 
-The dashboard talks to the CYD display board over the local network
-(`GET /api/data`, `GET /control?...`). See [`dashboard/README.md`](dashboard/README.md)
-for deployment onto the device and the hero-photo / fonts notes.
+The dashboard polls the ESP32S sensor hub directly over the local network
+(`GET /api/data`, `GET /control?...`). It needs:
 
-> Note: the public demo above **cannot** control a real terrarium — the device
-> lives on a private LAN and an HTTPS page can't call a plain-HTTP device. The
-> demo is for showing the interface; the real control path runs on the LAN.
+- Your browser to be on the **same WiFi network** as the ESP32S.
+- The page to be served over **plain HTTP** — an HTTPS page cannot call a
+  plain-HTTP device (mixed content).
+
+See [`dashboard/README.md`](dashboard/README.md) for more on serving the
+files, the hero-photo, and calibration notes.
