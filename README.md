@@ -40,3 +40,20 @@ The dashboard polls the ESP32S sensor hub directly over the local network
 
 See [`dashboard/README.md`](dashboard/README.md) for more on serving the
 files, the hero-photo, and calibration notes.
+
+## Acknowledgements
+
+This project was developed by **Team 17** as part of the **Interactive Systems**
+course at **Saarland University**.
+
+During development, we used **Claude (Anthropic)** as an AI coding assistant to
+support the implementation of several software components. Claude assisted with
+code generation, debugging, and iterative development for:
+
+- The EDEN web dashboard (HTML, CSS, and JavaScript).
+- The ESP32-based touchscreen interface and its on-screen user interface.
+- The ESP32S responsible for sensor integration and communication with
+  the dashboard.
+
+All design decisions, system architecture, hardware integration, testing, and
+final implementation were carried out by the project team.
